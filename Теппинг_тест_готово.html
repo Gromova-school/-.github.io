@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ теппинг-теста — Методика Ильина</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Библиотека для прямой генерации PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        
+        :root {
+            --burgundy: #8A0026;
+        }
+
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fafaf9;
+        }
+
+        .burgundy-accent { color: var(--burgundy); }
+        .bg-burgundy { background-color: var(--burgundy); }
+        .border-burgundy { border-color: var(--burgundy); }
+        .ring-burgundy:focus { --tw-ring-color: var(--burgundy); }
+
+        #pdfArea {
+            background: white !important;
+            width: 100%;
+            opacity: 1 !important;
+            filter: none !important;
+        }
+
+        .pdf-report-container {
+            padding: 40px 50px;
+            color: #111827 !important;
+            opacity: 1 !important;
+            filter: none !important;
+            background: #ffffff !important;
+        }
+
+        .pdf-header {
+            border-bottom: 4px solid var(--burgundy);
+            padding-bottom: 20px;
+            margin-bottom: 35px;
+            opacity: 1 !important;
+        }
+
+        .pdf-section-title, .section-title {
+            color: var(--burgundy) !important;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 15px;
+            margin-bottom: 20px;
+            border-left: 6px solid var(--burgundy);
+            padding-left: 15px;
+            letter-spacing: 0.05em;
+            opacity: 1 !important;
+            page-break-after: avoid;
+        }
+
+        .pdf-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin-bottom: 35px;
+        }
+
+        .pdf-metric-card {
+            background-color: #ffffff !important;
+            border: 2px solid #e5e7eb !important;
+            padding: 20px;
+            border-radius: 12px;
+            opacity: 1 !important;
+        }
+
+        .pdf-metric-card p {
+            color: #000000 !important;
+            font-weight: 800;
+            font-size: 18px;
+            opacity: 1 !important;
+        }
+
+        .pdf-metric-label {
+            color: #4b5563 !important;
+            font-weight: 900;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            display: block;
+            opacity: 1 !important;
+        }
+
+        .pdf-footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 2px solid #f3f4f6;
+            font-size: 12px;
+            color: #000000 !important;
+            text-align: center;
+            font-weight: 600;
+            opacity: 1 !important;
+            line-height: 1.5;
+        }
+
+        .conclusion-item {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+            opacity: 1 !important;
+        }
+
+        .conclusion-title {
+            color: var(--burgundy) !important;
+            font-weight: 900 !important;
+            font-size: 18px !important;
+            margin-bottom: 12px !important;
+            opacity: 1 !important;
+        }
+
+        .description-text {
+            color: #111827 !important;
+            line-height: 1.6;
+            font-size: 14px;
+            text-align: justify;
+            font-weight: 400;
+            opacity: 1 !important;
+        }
+
+        @media print {
+            body {
+                background: #ffffff !important;
+                color: #111827 !important;
+            }
+            .print-hidden { display: none !important; }
+            .shadow-xl, .border { box-shadow: none !important; border: none !important; }
+            @page { size: auto; margin: 10mm; }
+            h1, h2, h3, .report-title, .section-title, .conclusion-title, .accent {
+                color: #8A0026 !important;
+                opacity: 1 !important;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-stone-200 print:shadow-none print:border-none">
+        
+        <!-- Header -->
+        <header class="bg-burgundy text-white p-6 flex flex-col sm:flex-row justify-between items-center gap-4 print:bg-white print:text-black print:border-b print:border-stone-300">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight uppercase print:text-xl text-center sm:text-left">ОНЛАЙН ШКОЛА НАТАЛЬИ ГРОМОВОЙ</h1>
+                <p class="text-stone-300 text-sm print-hidden text-center sm:text-left">Определение типа нервной системы</p>
+                <p class="hidden print:block text-stone-600 text-xs uppercase font-bold tracking-widest mt-1">Протокол обследования</p>
+            </div>
+            <div id="actionBtns" class="hidden flex items-center gap-2 print:hidden">
+                <button onclick="downloadAsPDF()" class="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-6 py-2.5 rounded-lg transition-all backdrop-blur-sm font-bold shadow-sm text-sm">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>СКАЧАТЬ PDF</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="flex flex-col md:flex-row">
+            <!-- Left Column (Inputs) -->
+            <div class="w-full md:w-1/3 p-6 border-r border-stone-100 print:hidden">
+                <div class="flex items-center gap-2 mb-6 text-stone-500 font-semibold uppercase text-xs tracking-wider">
+                    <i data-lucide="user" class="w-4 h-4"></i> Данные испытуемого
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-stone-700 mb-1">Имя ребёнка</label>
+                        <input type="text" id="childName" class="w-full px-3 py-2 border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-semibold" placeholder="ФИО">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-stone-700 mb-1 flex items-center gap-1">Возраст <span id="ageAlert" class="text-amber-500"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i></span></label>
+                            <input type="number" id="childAge" class="w-full px-3 py-2 border border-amber-300 bg-amber-50 rounded-md focus:ring-2 outline-none ring-burgundy transition-colors font-semibold" placeholder="Лет">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-stone-700 mb-1">Класс</label>
+                            <input type="text" id="childGrade" class="w-full px-3 py-2 border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-semibold" placeholder="Класс">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-stone-100">
+                        <div class="flex items-center gap-2 mb-4 text-stone-500 font-semibold uppercase text-xs tracking-wider">
+                            <i data-lucide="clipboard-list" class="w-4 h-4"></i> Количество точек (D1-D6)
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-stone-400 mb-1 uppercase text-center">D1</label>
+                                <input type="number" id="d1" class="d-input w-full px-2 py-2 text-center border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-mono font-black text-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-stone-400 mb-1 uppercase text-center">D2</label>
+                                <input type="number" id="d2" class="d-input w-full px-2 py-2 text-center border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-mono font-black text-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-stone-400 mb-1 uppercase text-center">D3</label>
+                                <input type="number" id="d3" class="d-input w-full px-2 py-2 text-center border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-mono font-black text-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-stone-400 mb-1 uppercase text-center">D4</label>
+                                <input type="number" id="d4" class="d-input w-full px-2 py-2 text-center border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-mono font-black text-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-stone-400 mb-1 uppercase text-center">D5</label>
+                                <input type="number" id="d5" class="d-input w-full px-2 py-2 text-center border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-mono font-black text-lg">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-stone-400 mb-1 uppercase text-center">D6</label>
+                                <input type="number" id="d6" class="d-input w-full px-2 py-2 text-center border border-stone-300 rounded-md focus:ring-2 outline-none ring-burgundy font-mono font-black text-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="doneBtn" disabled class="w-full py-4 mt-4 rounded-xl text-white font-black flex items-center justify-center gap-2 transition-all shadow-md bg-stone-200 cursor-not-allowed opacity-50 text-lg">
+                        <span id="btnIcon"><i data-lucide="calculator" class="w-6 h-6"></i></span>
+                        <span id="btnText">ЗАПОЛНИТЕ D1-D6</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column (Report Area) -->
+            <div id="pdfArea" class="w-full md:w-2/3 p-0 bg-white min-h-[600px]">
+                <div id="welcomeScreen" class="h-full flex flex-col items-center justify-center text-stone-400 space-y-4 print:hidden p-6">
+                    <i data-lucide="calculator" class="w-12 h-12 stroke-1"></i>
+                    <p class="text-center max-w-[250px]">Введите значения D1–D6 для построения анализа</p>
+                </div>
+
+                <div id="analysisContent" class="hidden fade-in pdf-report-container">
+                    
+                    <div class="pdf-header">
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <h2 class="text-3xl font-black burgundy-accent uppercase tracking-tighter report-title">Протокол обследования</h2>
+                                <p class="text-[14px] font-bold text-stone-800">Методика: Теппинг-тест (Е.П. Ильина)</p>
+                            </div>
+                            <div class="text-right text-[12px] font-black text-stone-700 uppercase">
+                                Дата: <span id="printDateSpan"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pdf-grid">
+                        <div class="pdf-metric-card border-stone-300">
+                            <span class="pdf-metric-label">ФИО ребёнка</span>
+                            <p id="outName" class="text-black">—</p>
+                        </div>
+                        <div class="pdf-metric-card border-stone-300">
+                            <span class="pdf-metric-label">Возраст</span>
+                            <p id="outAge" class="text-black">—</p>
+                        </div>
+                        <div class="pdf-metric-card border-stone-300">
+                            <span class="pdf-metric-label">Класс</span>
+                            <p id="outGrade" class="text-black">—</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-12">
+                        <div class="pdf-section-title">Динамика работоспособности</div>
+                        <div class="h-80 w-full bg-white border-2 border-stone-200 rounded-2xl p-6 shadow-sm">
+                            <canvas id="tappingChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div id="metricsBlock" class="hidden grid grid-cols-4 gap-5 mb-12">
+                        <div class="pdf-metric-card text-center border-stone-300">
+                            <span class="pdf-metric-label">Всего</span>
+                            <div id="metricTotal" class="text-2xl font-black text-black">0</div>
+                        </div>
+                        <div class="pdf-metric-card text-center border-stone-300">
+                            <span class="pdf-metric-label">Среднее</span>
+                            <div id="metricAvg" class="text-2xl font-black text-black">0</div>
+                        </div>
+                        <div class="pdf-metric-card text-center border-stone-300">
+                            <span class="pdf-metric-label">Темп</span>
+                            <div id="metricTempo" class="text-2xl font-black">...</div>
+                        </div>
+                        <div class="pdf-metric-card text-center border-stone-300">
+                            <span class="pdf-metric-label">КСНС</span>
+                            <div id="metricKSNS" class="text-2xl font-black text-black">0%</div>
+                        </div>
+                    </div>
+
+                    <div id="conclusionBlock" class="hidden">
+                        <div class="pdf-section-title">Итоговое заключение</div>
+                        <div class="space-y-6">
+                            <div class="conclusion-item">
+                                <h3 id="resNSType" class="conclusion-title">...</h3>
+                                <div id="resNSDesc" class="description-text whitespace-pre-line"></div>
+                            </div>
+                            <div class="conclusion-item">
+                                <h3 id="resTempoTitle" class="conclusion-title">...</h3>
+                                <div id="resTempoDesc" class="description-text"></div>
+                            </div>
+                            <div class="conclusion-item">
+                                <h3 id="resKSNSTitle" class="conclusion-title">...</h3>
+                                <div id="resKSNSDesc" class="description-text"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="recommendationsBlock" class="hidden mt-12 pt-8 border-t-4 border-burgundy">
+                        <div class="pdf-section-title">Рекомендации</div>
+                        <div class="space-y-6">
+                            <div id="recNS" class="conclusion-item"></div>
+                            <div id="recTempo" class="conclusion-item"></div>
+                            <div class="conclusion-item p-4 bg-stone-50 rounded-xl italic border-l-4 border-burgundy">
+                                <p class="description-text font-semibold">
+                                    Тип нервной системы показывает, насколько ребёнок в целом вынослив к нагрузкам, темп — с какой скоростью он работает, а коэффициент — как он устаёт в процессе: быстро или постепенно, либо, наоборот, «разгоняется» и работает лучше со временем.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pdf-footer">
+                        <div>Разработчик приложения — Наталья Громова. Тел. для связи: 8-912-528-43-95</div>
+                        <div class="mt-2 text-[10px] uppercase opacity-70">Данные результаты являются ознакомительными и требуют обязательной консультации со специалистом</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-burgundy fixed top-0 left-0 w-full h-1 print-hidden"></div>
+
+    <script>
+        lucide.createIcons();
+
+        const inputs = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'];
+        const chartColor = '#8A0026';
+        let chart = null;
+
+        const DESCRIPTIONS = {
+            NS: {
+                I: {
+                    type: "Сильный тип нервной системы (I тип)",
+                    desc: "У ребёнка выявлен сильный тип нервной системы.\nЭто означает высокую работоспособность и устойчивость к нагрузкам. Нервная система долго сохраняет эффективность, а процессы утомления включаются значительно позже, чем у других детей.\nВ работе такие дети обычно не сразу включаются в деятельность. Им требуется время на «врабатывание», но после этого они способны длительно удерживать внимание и работать на высоком уровне. Часто максимальная продуктивность приходится не на начало, а на середину или вторую половину занятия.\nВ поведении это может проявляться как откладывание начала работы, снижение мотивации при отсутствии внешнего давления, а также стремление к более интенсивной, динамичной деятельности. В условиях дефицита нагрузки такие дети могут выглядеть невнимательными или несобранными."
+                },
+                II: {
+                    type: "Стабильный (среднесильный) тип нервной системы (II тип)",
+                    desc: "У ребёнка выявлен стабильный тип нервной системы.\nЭто наиболее уравновешенный вариант, при котором работоспособность сохраняется на примерно одинаковом уровне в течение всей деятельности. Ребёнок достаточно быстро включается в работу и может поддерживать стабильное внимание без выраженных спадов и перегрузок.\nТакие дети, как правило, предсказуемы в обучении: они не требуют длительного врабатывания, но и не демонстрируют резкого истощения. Их продуктивность относительно равномерна на протяжении всего занятия.\nВ поведении это проявляется как устойчивость, спокойное выполнение заданий и способность работать в стандартном учебном темпе без выраженных трудностей адаптации."
+                },
+                III: {
+                    type: "Волнообразный тип нервной системы (III тип)",
+                    desc: "У ребёнка выявлен волнообразный тип нервной системы.\nЭтот тип характеризуется замедленным включением в деятельность при сохранной общей выносливости. В начале работы ребёнок может испытывать трудности с пониманием инструкции, ориентировкой в задании и переходом к активным действиям.\nПосле периода врабатывания продуктивность повышается, и ребёнок способен достаточно устойчиво работать без выраженного истощения. При этом темп деятельности остаётся более медленным по сравнению со сверстниками.\nВ поведении это проявляется как замедленность, необходимость времени на включение в задание, трудности при быстрых переключениях и при работе в условиях ограниченного времени. При этом такие дети не склонны к быстрому утомлению, но нуждаются в более чёткой структуре и последовательности."
+                },
+                IV: {
+                    type: "Средне-слабый тип нервной системы (IV тип)",
+                    desc: "У ребёнка выявлен средне-слабый тип нервной системы.\nЭтот вариант характеризуется сниженной выносливостью, однако без резкого падения работоспособности. Продуктивность уменьшается постепенно, без выраженного «обвала» в процессе выполнения задания.\nРебёнок может достаточно долго сохранять внешнюю включённость в деятельность, но при этом постепенно снижается темп и качество работы. Утомление накапливается незаметно, что иногда затрудняет своевременную оценку нагрузки.\nВ поведении это проявляется как постепенное замедление, снижение концентрации к концу задания, необходимость пауз и более щадящего режима работы. Несмотря на более мягкую динамику, общий уровень выносливости остаётся сниженным."
+                },
+                V: {
+                    type: "Слабый тип нервной системы (V тип)",
+                    desc: "У ребёнка выявлен слабый тип нервной системы.\nЭто означает низкую выносливость к нагрузкам. Нервная система быстро истощается, и процессы охранительного торможения включаются на ранних этапах деятельности.\nРебёнок обычно эффективно работает только в начале задания, после чего наблюдается снижение темпа, внимания и качества выполнения. Длительная или интенсивная нагрузка приводит к быстрому утомлению.\nВ поведении это проявляется как быстрая усталость, снижение работоспособности, трудности при работе в условиях времени, повышенная чувствительность к нагрузке и стрессу. В сложных или напряжённых ситуациях ребёнок может «выключаться» из деятельности и прекращать выполнение задания."
+                }
+            },
+            TEMPO: {
+                Low: { 
+                    title: "Низкий темп деятельности", 
+                    text: "Темп выполнения заданий ниже возрастной нормы.\nРебёнок работает медленно, ему требуется больше времени на выполнение заданий и переход от одного действия к другому. В условиях ограниченного времени может не успевать завершать задания в полном объёме.\nТакой темп не всегда связан с недостатком понимания, чаще это особенность переработки информации и организации деятельности. При увеличении скорости работы может снижаться качество выполнения." 
+                },
+                Mid: { 
+                    title: "Средний темп деятельности", 
+                    text: "Темп выполнения заданий соответствует возрастной норме.\nРебёнок способен работать в стандартном учебном ритме, успевает выполнять задания в отведённое время без выраженного напряжения. Темп деятельности позволяет сохранять баланс между скоростью и качеством выполнения." 
+                },
+                High: { 
+                    title: "Высокий темп деятельности", 
+                    text: "Темп выполнения заданий выше возрастной нормы.\nРебёнок работает быстро, легко включается в выполнение заданий и стремится завершить их в короткое время. При этом может снижаться точность и увеличиваться количество ошибок, особенно в заданиях, требующих контроля и проверки.\nВ некоторых случаях ребёнок опережает общий темп группы, что может приводить к потере внимания после завершения задания." 
+                }
+            },
+            KSNS: {
+                RNegative: { 
+                    title: "Резко отрицательный коэффициент", 
+                    text: "Коэффициент отражает, как меняется работоспособность ребёнка в процессе выполнения задания: сохраняется ли она, снижается или, наоборот, увеличивается. В отличие от темпа (скорости работы) и типа нервной системы (общей выносливости), этот показатель показывает именно динамику утомления во времени.\nВ данном случае отмечается выраженное снижение работоспособности.\nПродуктивность быстро падает уже на ранних этапах деятельности, что указывает на быстрое истощение при нагрузке. Ребёнку сложно поддерживать темп и качество работы на протяжении всего задания.\nТакая динамика свидетельствует о низкой нейродинамической выносливости: нагрузка переносится ограниченно, требуется чёткое дозирование объёма работы и регулярные паузы для восстановления." 
+                },
+                UNegative: { 
+                    title: "Умеренно отрицательный коэффициент", 
+                    text: "Коэффициент отражает изменение работоспособности ребёнка в процессе выполнения задания. Он показывает не скорость работы, а то, как ребёнок выдерживает нагрузку во времени.\nВ данном случае наблюдается постепенное снижение работоспособности.\nПродуктивность уменьшается по мере продолжения деятельности, что говорит об утомляемости при длительной нагрузке. Ребёнок может сохранять включённость, но со временем снижается темп и качество выполнения.\nТакая динамика указывает на ограниченную нейродинамическую выносливость и необходимость учитывать длительность и плотность нагрузки." 
+                },
+                Zero: { 
+                    title: "Коэффициент, близкий к нулю", 
+                    text: "Коэффициент показывает, как меняется работоспособность в процессе выполнения задания, то есть насколько ребёнок устойчив к нагрузке во времени.\nВ данном случае работоспособность остаётся относительно стабильной.\nРебёнок демонстрирует равномерную продуктивность без выраженных спадов или подъёмов. Темп и качество выполнения остаются примерно одинаковыми на протяжении всей деятельности.\nТакая динамика свидетельствует о сбалансированной нейродинамике и способности поддерживать устойчивую работоспособность при стандартной нагрузке." 
+                },
+                Positive: { 
+                    title: "Положительный коэффициент", 
+                    text: "Коэффициент отражает динамику работоспособности в процессе выполнения задания — усиливается ли она или снижается по мере работы.\nВ данном случае наблюдается нарастание работоспособности.\nПродуктивность увеличивается по мере продолжения деятельности: ребёнку требуется время на включение, после чего эффективность возрастает. Наилучшие результаты достигаются не в начале, а позже.\nТакая динамика указывает на способность к врабатыванию и хорошую выносливость при продолжительной нагрузке." 
+                }
+            }
+        };
+
+        const RECS = {
+            NS: {
+                I: "Рекомендуется выстраивать занятия с учётом необходимости «врабатывания».\nВ начале занятия не стоит ожидать максимальной включённости. Основной объём сложных заданий лучше переносить на середину или вторую половину работы, когда ребёнок выходит на пик работоспособности.\nЭффективны задания с чёткими сроками выполнения и элементами ограниченного времени, так как это повышает мобилизацию. При этом важно контролировать не только скорость, но и качество выполнения.\nДопустим более высокий объём нагрузки по сравнению со средним, так как ребёнок способен длительно сохранять работоспособность.",
+                II: "Рекомендуется стандартная организация занятий без выраженных перегрузок и резких изменений темпа.\nРебёнок способен равномерно работать на протяжении всего занятия, поэтому задания можно распределять относительно равномерно без смещения нагрузки.\nВажно избегать резких переключений между видами деятельности, сохраняя логичную и последовательную структуру занятия.",
+                III: "Рекомендуется учитывать замедленное включение в деятельность.\nВ начале задания необходимо закладывать дополнительное время на понимание инструкции и вхождение в работу. Эффективно использовать чёткие, пошаговые инструкции без перегрузки информацией.\nНе рекомендуется частая смена заданий и резкие переключения. Ребёнка важно заранее предупреждать о смене деятельности.\nДля повышения эффективности требуется достаточный объём повторений и отработки, так как автоматизация существенно улучшает результат.",
+                IV: "Рекомендуется учитывать постепенное снижение работоспособности.\nЗадания можно выстраивать более равномерно, чем при слабом типе, однако важно контролировать накопление утомления к концу занятия.\nЖелательно включать паузы и смену активности до выраженного снижения продуктивности. Объём нагрузки должен быть умеренным, без длительных непрерывных блоков.",
+                V: "Рекомендуется щадящий режим нагрузки с чётким дозированием заданий.\nЗанятие лучше выстраивать короткими блоками с возможностью переключения и отдыха. Основной объём заданий следует давать в начале работы, когда работоспособность максимальна.\nВажно избегать давления, жёстких временных ограничений и ситуаций, вызывающих стресс. Поддерживающая и предсказуемая структура занятия значительно повышает эффективность."
+            },
+            TEMPO: {
+                Low: "Рекомендуется увеличивать время на выполнение заданий и снижать требования к скорости.\nВажно давать возможность доводить задания до конца без спешки. При попытке ускорить ребёнка может снижаться качество выполнения и возрастать утомляемость.\nПри планировании занятий следует уменьшать объём заданий в единицу времени.",
+                Mid: "Дополнительной корректировки не требуется.\nРебёнок способен работать в стандартном учебном ритме без необходимости изменения скорости или объёма заданий.",
+                High: "Рекомендуется уделять особое внимание контролю качества выполнения заданий.\nВажно формировать навык самопроверки и замедления в заданиях, требующих точности. При необходимости целесообразно сознательно снижать темп работы.\nТакже стоит предусматривать дополнительную занятость после быстрого выполнения заданий, чтобы сохранить включённость ребёнка."
+            }
+        };
+
+        function getNSType(d) {
+            const [D1, D2, D3, D4, D5, D6] = d;
+            const threshold = D1 * 0.15;
+            const getSign = (a, b) => (b > a ? 1 : (b < a ? -1 : 0));
+            const signs = [getSign(D1, D2), getSign(D2, D3), getSign(D3, D4), getSign(D4, D5), getSign(D5, D6)];
+            let switches = 0; let lastSign = 0;
+            for (let s of signs) { if (s !== 0) { if (lastSign !== 0 && s !== lastSign) switches++; lastSign = s; } }
+            let crossings = 0;
+            for (let i = 1; i < d.length; i++) { if ((d[i-1] <= D1 && d[i] > D1) || (d[i-1] >= D1 && d[i] < D1)) crossings++; }
+
+            const maxVal = Math.max(...d);
+            const peakVal = Math.max(D2, D3, D4);
+            const peakIdx = d.indexOf(peakVal);
+            
+            if (peakVal >= D1 + threshold && peakIdx >= 1 && peakIdx <= 3 && switches <= 2) return "I";
+            if (d.every(val => Math.abs(val - D1) <= threshold)) return "II";
+            if (crossings >= 2 && switches >= 2) return "III";
+            if (signs[0] <= 0 && D6 > Math.min(...d)) return "IV";
+            if (D6 <= D1 - threshold) return "V";
+            return D6 < D1 ? "V" : "IV";
+        }
+
+        function updateChart() {
+            const vals = inputs.map(id => document.getElementById(id).value === '' ? null : Number(document.getElementById(id).value));
+            if (!vals.some(v => v !== null)) {
+                document.getElementById('welcomeScreen').style.display = 'flex';
+                document.getElementById('analysisContent').style.display = 'none';
+                return;
+            }
+            document.getElementById('welcomeScreen').style.display = 'none';
+            document.getElementById('analysisContent').style.display = 'block';
+            const ctx = document.getElementById('tappingChart').getContext('2d');
+            const baseline = vals[0];
+            const datasets = [{
+                data: vals, borderColor: chartColor, backgroundColor: 'rgba(138, 0, 38, 0.08)', borderWidth: 6,
+                tension: 0.35, pointBackgroundColor: '#ffffff', pointBorderWidth: 4, pointBorderColor: chartColor,
+                fill: true, spanGaps: true
+            }];
+            if (baseline !== null) {
+                datasets.push({
+                    label: 'D1 (старт)', data: vals.map(() => baseline), borderColor: 'rgba(0,0,0,0.35)',
+                    borderWidth: 2, borderDash: [8, 6], pointRadius: 0, fill: false
+                });
+            }
+            if (chart) { chart.data.datasets = datasets; chart.update('none'); }
+            else {
+                chart = new Chart(ctx, {
+                    type: 'line', data: { labels: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'], datasets },
+                    options: { responsive: true, maintainAspectRatio: false, animation: false,
+                        layout: { padding: { left: 20, right: 45, top: 10, bottom: 10 } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#e5e7eb' }, suggestedMax: Math.max(...vals.filter(v => v !== null), 0) + 10, ticks: { font: { size: 12, weight: '900' } } },
+                            x: { offset: true, grid: { display: false }, ticks: { font: { size: 12, weight: '900' } } }
+                        },
+                        elements: { point: { radius: 7, hoverRadius: 8, clip: false } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        function runAnalysis() {
+            const d = inputs.map(id => Number(document.getElementById(id).value));
+            const age = document.getElementById('childAge').value !== '' ? Number(document.getElementById('childAge').value) : null;
+            const total = d.reduce((a, b) => a + b, 0);
+            const avgVal = total / 6;
+            const ksnsVal = (((d[3] - d[2]) + (d[4] - d[2]) + (d[5] - d[2])) / (d[2] || 1) * 100).toFixed(1);
+
+            let tempoKey = "Mid";
+            if (age !== null) {
+                if (age < 9) { if (avgVal < 16) tempoKey = "Low"; else if (avgVal > 20) tempoKey = "High"; }
+                else if (age <= 12) { if (avgVal < 20) tempoKey = "Low"; else if (avgVal > 25) tempoKey = "High"; }
+                else { if (avgVal <= 24) tempoKey = "Low"; else if (avgVal > 30) tempoKey = "High"; }
+            }
+
+            document.getElementById('outName').innerText = document.getElementById('childName').value || '—';
+            document.getElementById('outAge').innerText = age !== null ? `${age} лет` : '—';
+            document.getElementById('outGrade').innerText = document.getElementById('childGrade').value || '—';
+            document.getElementById('metricTotal').innerText = total;
+            document.getElementById('metricAvg').innerText = avgVal.toFixed(1);
+            document.getElementById('metricKSNS').innerText = `${ksnsVal}%`;
+            document.getElementById('metricTempo').innerText = age !== null ? (tempoKey === "Low" ? "Низкий" : tempoKey === "High" ? "Высокий" : "Средний") : "Укажите возраст";
+            document.getElementById('metricTempo').style.color = age !== null ? (tempoKey === "Low" ? "#dc2626" : (tempoKey === "High" ? "#059669" : "#8A0026")) : "#6b7280";
+
+            const nsKey = getNSType(d);
+            const ns = DESCRIPTIONS.NS[nsKey];
+            const ksns = Number(ksnsVal) <= -15 ? DESCRIPTIONS.KSNS.RNegative : (Number(ksnsVal) < -5 ? DESCRIPTIONS.KSNS.UNegative : (Number(ksnsVal) <= 5 ? DESCRIPTIONS.KSNS.Zero : DESCRIPTIONS.KSNS.Positive));
+            
+            document.getElementById('resNSType').innerText = ns.type;
+            document.getElementById('resNSDesc').innerText = ns.desc;
+            if (age !== null) {
+                document.getElementById('resTempoTitle').innerText = DESCRIPTIONS.TEMPO[tempoKey].title;
+                document.getElementById('resTempoDesc').innerText = DESCRIPTIONS.TEMPO[tempoKey].text;
+                document.getElementById('resTempoTitle').parentElement.style.display = 'block';
+            } else document.getElementById('resTempoTitle').parentElement.style.display = 'none';
+
+            document.getElementById('resKSNSTitle').innerText = ksns.title;
+            document.getElementById('resKSNSDesc').innerText = ksns.text;
+
+            // Recommendations
+            document.getElementById('recommendationsBlock').classList.remove('hidden');
+            document.getElementById('recNS').innerHTML = `<h4 class="conclusion-title">По типу нервной системы</h4><p class="description-text whitespace-pre-line">${RECS.NS[nsKey]}</p>`;
+            if (age !== null) {
+                document.getElementById('recTempo').innerHTML = `<h4 class="conclusion-title">По темпу деятельности</h4><p class="description-text whitespace-pre-line">${RECS.TEMPO[tempoKey]}</p>`;
+                document.getElementById('recTempo').style.display = 'block';
+            } else document.getElementById('recTempo').style.display = 'none';
+
+            document.getElementById('metricsBlock').classList.remove('hidden');
+            document.getElementById('conclusionBlock').classList.remove('hidden');
+            document.getElementById('actionBtns').classList.remove('hidden');
+            document.getElementById('printDateSpan').innerText = new Date().toLocaleDateString('ru-RU');
+            updateChart();
+        }
+
+        async function downloadAsPDF() {
+            const element = document.getElementById('pdfArea');
+            const name = document.getElementById('childName').value || "Protokol";
+            const opt = {
+                margin: 0, filename: `Протокол_Теппинг_Тест_${name.replace(/\s+/g, '_')}.pdf`,
+                image: { type: 'jpeg', quality: 1 },
+                html2canvas: { scale: 3, useCORS: true, backgroundColor: '#ffffff', logging: false, letterRendering: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        function validate() {
+            const allD = inputs.every(id => document.getElementById(id).value.trim() !== '');
+            const btn = document.getElementById('doneBtn'), ageInput = document.getElementById('childAge');
+            if (ageInput.value !== '') { ageInput.classList.remove('border-amber-300', 'bg-amber-50'); document.getElementById('ageAlert').classList.add('hidden'); }
+            else { ageInput.classList.add('border-amber-300', 'bg-amber-50'); document.getElementById('ageAlert').classList.remove('hidden'); }
+            if (allD) {
+                btn.disabled = false; btn.classList.remove('bg-stone-200', 'cursor-not-allowed', 'opacity-50'); btn.classList.add('bg-burgundy', 'hover:brightness-110');
+                document.getElementById('btnText').innerText = 'ГОТОВО'; document.getElementById('btnIcon').innerHTML = '<i data-lucide=\"check-circle-2\" class=\"w-5 h-5\"></i>';
+                lucide.createIcons(); runAnalysis();
+            } else {
+                btn.disabled = true; btn.classList.remove('bg-burgundy', 'hover:brightness-110'); btn.classList.add('bg-stone-200', 'cursor-not-allowed', 'opacity-50');
+                document.getElementById('btnText').innerText = 'ЗАПОЛНИТЕ D1-D6'; document.getElementById('btnIcon').innerHTML = '<i data-lucide=\"calculator\" class=\"w-5 h-5\"></i>';
+                lucide.createIcons(); updateChart();
+            }
+        }
+
+        inputs.forEach((id, index) => {
+            const el = document.getElementById(id);
+            el.addEventListener('input', (e) => {
+                validate();
+                if (e.target.value.length >= 2 && index < inputs.length - 1) document.getElementById(inputs[index+1]).focus();
+            });
+        });
+        document.getElementById('childAge').addEventListener('input', validate);
+        document.getElementById('childName').addEventListener('input', () => { if(!document.getElementById('metricsBlock').classList.contains('hidden')) runAnalysis(); });
+        document.getElementById('childGrade').addEventListener('input', () => { if(!document.getElementById('metricsBlock').classList.contains('hidden')) runAnalysis(); });
+        document.getElementById('doneBtn').addEventListener('click', runAnalysis);
+    </script>
+</body>
+</html>
